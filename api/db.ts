@@ -28,9 +28,17 @@ function initDatabase() {
       remark TEXT,
       date TEXT NOT NULL,
       member_id INTEGER NOT NULL,
+      reimbursement_status TEXT DEFAULT 'none' CHECK(reimbursement_status IN ('none', 'pending', 'reimbursed')),
+      receipt_image TEXT,
+      reimbursed_by INTEGER,
+      reimbursed_at TEXT,
+      parent_transaction_id INTEGER,
+      is_split INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
+      FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE,
+      FOREIGN KEY (reimbursed_by) REFERENCES members(id) ON DELETE SET NULL,
+      FOREIGN KEY (parent_transaction_id) REFERENCES transactions(id) ON DELETE SET NULL
     );
 
     CREATE TABLE IF NOT EXISTS tags (
@@ -94,9 +102,53 @@ function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
     CREATE INDEX IF NOT EXISTS idx_transactions_member ON transactions(member_id);
     CREATE INDEX IF NOT EXISTS idx_transactions_type ON transactions(type);
+    CREATE INDEX IF NOT EXISTS idx_transactions_reimbursement ON transactions(reimbursement_status);
+    CREATE INDEX IF NOT EXISTS idx_transactions_parent ON transactions(parent_transaction_id);
     CREATE INDEX IF NOT EXISTS idx_aa_records_payer ON aa_records(payer_id);
     CREATE INDEX IF NOT EXISTS idx_aa_records_beneficiary ON aa_records(beneficiary_id);
     CREATE INDEX IF NOT EXISTS idx_recurring_active ON recurring_transactions(active);
+
+    CREATE TABLE IF NOT EXISTS transaction_splits (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      parent_transaction_id INTEGER NOT NULL,
+      child_transaction_id INTEGER NOT NULL,
+      member_id INTEGER NOT NULL,
+      amount REAL NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (parent_transaction_id) REFERENCES transactions(id) ON DELETE CASCADE,
+      FOREIGN KEY (child_transaction_id) REFERENCES transactions(id) ON DELETE CASCADE,
+      FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS financial_goals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      target_amount REAL NOT NULL,
+      current_amount REAL DEFAULT 0,
+      deadline TEXT,
+      description TEXT,
+      color TEXT DEFAULT '#3b82f6',
+      icon TEXT DEFAULT '🎯',
+      auto_track INTEGER DEFAULT 0,
+      status TEXT DEFAULT 'active' CHECK(status IN ('active', 'completed', 'paused')),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS goal_transactions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      goal_id INTEGER NOT NULL,
+      transaction_id INTEGER,
+      amount REAL NOT NULL,
+      type TEXT NOT NULL CHECK(type IN ('deposit', 'withdraw', 'auto')),
+      remark TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (goal_id) REFERENCES financial_goals(id) ON DELETE CASCADE,
+      FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE SET NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_goal_transactions_goal ON goal_transactions(goal_id);
+    CREATE INDEX IF NOT EXISTS idx_financial_goals_status ON financial_goals(status);
   `);
 
   const memberCount = (db.prepare('SELECT COUNT(*) as count FROM members').get() as { count: number }).count;

@@ -27,6 +27,7 @@ router.get('/:month', (req: Request, res: Response): void => {
     SELECT category, SUM(amount) as total
     FROM transactions
     WHERE type = 'expense' AND date LIKE ?
+      AND NOT EXISTS (SELECT 1 FROM transaction_splits ts WHERE ts.parent_transaction_id = transactions.id)
     GROUP BY category
   `)
   const expenses = expenseStmt.all(`${month}%`) as Array<{ category: string; total: number }>
@@ -113,6 +114,7 @@ router.get('/', (_req: Request, res: Response): void => {
       SELECT category, SUM(amount) as total
       FROM transactions
       WHERE type = 'expense' AND date LIKE ?
+        AND NOT EXISTS (SELECT 1 FROM transaction_splits ts WHERE ts.parent_transaction_id = transactions.id)
       GROUP BY category
     `)
     const expenses = expenseStmt.all(`${budget.month}%`) as Array<{ category: string; total: number }>

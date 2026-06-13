@@ -11,19 +11,23 @@ import {
   Users,
   ChevronRight,
   Calendar,
+  Zap,
 } from 'lucide-react'
 import {
   getOverview,
   getCategoryPie,
   getTrend,
   getTransactions,
+  getQuickEntries,
+  createTransaction,
   type OverviewData,
   type TrendItem,
   type CategoryPieData,
   type Transaction,
   type Budget,
+  type QuickEntry,
 } from '@/api'
-import { useMemberStore, useBudgetStore } from '@/store'
+import { useMemberStore, useBudgetStore, useUIStore } from '@/store'
 import { cn } from '@/lib/utils'
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -103,15 +107,53 @@ export default function Dashboard() {
   const [categoryPie, setCategoryPie] = useState<CategoryPieData | null>(null)
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([])
   const [memberExpenses, setMemberExpenses] = useState<Map<number, number>>(new Map())
+  const [quickEntries, setQuickEntries] = useState<QuickEntry[]>([])
   const [loading, setLoading] = useState(false)
+  const [quickLoading, setQuickLoading] = useState(false)
 
   const { members, fetchMembers } = useMemberStore()
   const { currentBudget, fetchBudget } = useBudgetStore()
+  const { showToast } = useUIStore()
 
   useEffect(() => {
     fetchMembers()
     fetchBudget(month)
   }, [month, fetchMembers, fetchBudget])
+
+  useEffect(() => {
+    const fetchQuickEntries = async () => {
+      setQuickLoading(true)
+      try {
+        const res = await getQuickEntries(5)
+        if (res.success && res.data) {
+          setQuickEntries(res.data)
+        }
+      } finally {
+        setQuickLoading(false)
+      }
+    }
+    fetchQuickEntries()
+  }, [])
+
+  const handleQuickEntry = async (entry: QuickEntry) => {
+    try {
+      const res = await createTransaction({
+        type: entry.type,
+        amount: entry.amount,
+        category: entry.category,
+        remark: entry.remark,
+        date: new Date().toISOString().split('T')[0],
+        member_id: entry.member.id,
+      })
+      if (res.success) {
+        showToast(`快捷记账成功：${entry.remark} -¥${entry.amount.toFixed(2)}`, 'success')
+      } else {
+        showToast(res.error || '快捷记账失败', 'error')
+      }
+    } catch {
+      showToast('快捷记账失败', 'error')
+    }
+  }
 
   useEffect(() => {
     const fetchData = async () => {
@@ -139,7 +181,7 @@ export default function Dashboard() {
 
           const expenses = new Map<number, number>()
           allTransactions.forEach((t) => {
-            if (t.type === 'expense') {
+            if (t.type === 'expense' && !t.splits) {
               const current = expenses.get(t.member_id) || 0
               expenses.set(t.member_id, current + t.amount)
             }
@@ -326,6 +368,43 @@ export default function Dashboard() {
         </div>
       ) : (
         <div className="space-y-6">
+          {quickEntries.length > 0 && (
+            <div className="bg-white rounded-lg border p-5">
+              <div className="flex items-center mb-4">
+                <Zap className="w-5 h-5 text-yellow-500 mr-2" />
+                <h2 className="text-lg font-semibold text-gray-900">快捷记账</h2>
+                <span className="ml-2 text-xs text-gray-400">近30天高频账目，一键记账</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                {quickEntries.map((entry) => (
+                  <button
+                    key={`${entry.remark}-${entry.category}-${entry.member.id}`}
+                    onClick={() => handleQuickEntry(entry)}
+                    disabled={quickLoading}
+                    className="flex flex-col items-start p-3 rounded-lg border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all text-left group disabled:opacity-50"
+                  >
+                    <div className="flex items-center w-full justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-900 truncate flex-1">{entry.remark}</span>
+                      <span className="ml-1 text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 group-hover:bg-blue-100 group-hover:text-blue-600">
+                        {entry.frequency}次
+                      </span>
+                    </div>
+                    <div className="flex items-center text-xs text-gray-500 mb-1">
+                      <span>{entry.category}</span>
+                      <span className="mx-1">·</span>
+                      <span>{entry.member.name}</span>
+                    </div>
+                    <div className={cn(
+                      'text-base font-bold',
+                      entry.type === 'income' ? 'text-green-600' : 'text-red-600'
+                    )}>
+                      {entry.type === 'income' ? '+' : '-'}¥{entry.amount.toFixed(2)}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white rounded-lg border p-5">
               <div className="flex items-center justify-between mb-3">

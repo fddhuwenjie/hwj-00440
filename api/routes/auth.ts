@@ -26,7 +26,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
  * User Logout
  * POST /api/auth/logout
  */
-router.post('/logout', async (req: Request, res: Response): Promise<void> => {
+router.post('/logout', async (_req: Request, _res: Response): Promise<void> => {
   // TODO: Implement logout logic
 })
 

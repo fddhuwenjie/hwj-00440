@@ -9,6 +9,7 @@ import Budget from '@/pages/Budget'
 import Statistics from '@/pages/Statistics'
 import Recurring from '@/pages/Recurring'
 import ImportExport from '@/pages/ImportExport'
+import Goals from '@/pages/Goals'
 import { useUIStore } from '@/store'
 
 function AppContent() {
@@ -53,6 +54,7 @@ export default function App() {
           <Route path="statistics" element={<Statistics />} />
           <Route path="recurring" element={<Recurring />} />
           <Route path="import-export" element={<ImportExport />} />
+          <Route path="goals" element={<Goals />} />
         </Route>
       </Routes>
     </Router>

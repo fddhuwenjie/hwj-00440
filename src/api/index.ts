@@ -28,10 +28,27 @@ export interface Transaction {
   remark: string | null
   date: string
   member_id: number
+  reimbursement_status: 'none' | 'pending' | 'reimbursed'
+  receipt_image: string | null
+  reimbursed_by: number | null
+  reimbursed_at: string | null
+  parent_transaction_id: number | null
+  is_split: number
   created_at: string
   updated_at: string
   member: Member
   tags: Tag[]
+  splits?: TransactionSplit[]
+  reimbursed_by_member?: Member
+}
+
+export interface TransactionSplit {
+  id: number
+  member_id: number
+  amount: number
+  member_name: string
+  member_avatar: string
+  child_transaction_id: number
 }
 
 export interface TransactionListParams {
@@ -41,6 +58,7 @@ export interface TransactionListParams {
   start_date?: string
   end_date?: string
   tag?: string
+  reimbursement_status?: string
   page?: number
   page_size?: number
 }
@@ -60,6 +78,9 @@ export interface CreateTransactionData {
   date: string
   member_id: number
   tags?: string[]
+  reimbursement_status?: 'none' | 'pending' | 'reimbursed'
+  receipt_image?: string
+  goal_id?: number
 }
 
 export interface UpdateTransactionData {
@@ -70,6 +91,22 @@ export interface UpdateTransactionData {
   date?: string
   member_id?: number
   tags?: string[]
+  reimbursement_status?: 'none' | 'pending' | 'reimbursed'
+  receipt_image?: string
+  goal_id?: number | null
+}
+
+export interface SplitTransactionData {
+  splits: Array<{ member_id: number; amount: number }>
+}
+
+export interface SetReimbursementData {
+  status: 'none' | 'pending' | 'reimbursed'
+  receipt_image?: string
+}
+
+export interface ConfirmReimbursementData {
+  confirmed_by_member_id: number
 }
 
 export interface BudgetCategoryDetail {
@@ -656,4 +693,187 @@ export async function importCSV(file: File): Promise<ApiResponse<ImportResult>> 
       error: error instanceof Error ? error.message : 'Network error',
     }
   }
+}
+
+export function splitTransaction(
+  id: number,
+  data: SplitTransactionData
+): Promise<ApiResponse<Transaction>> {
+  return request<Transaction>(`/transactions/${id}/split`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function setTransactionReimbursement(
+  id: number,
+  data: SetReimbursementData
+): Promise<ApiResponse<Transaction>> {
+  return request<Transaction>(`/transactions/${id}/set-reimbursement`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function confirmReimbursement(
+  id: number,
+  data: ConfirmReimbursementData
+): Promise<ApiResponse<Transaction & { offset_transaction_id: number }>> {
+  return request<Transaction & { offset_transaction_id: number }>(`/transactions/${id}/confirm-reimbursement`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export interface CategoryPredictionItem {
+  category: string
+  count: number
+  total: number
+  confidence: number
+}
+
+export interface CategoryPrediction {
+  predicted: string
+  alternatives: CategoryPredictionItem[]
+  all_categories: CategoryPredictionItem[]
+}
+
+export function predictCategory(
+  remark: string,
+  amount?: number,
+  type?: 'income' | 'expense'
+): Promise<ApiResponse<CategoryPrediction | null>> {
+  const params: Record<string, unknown> = { remark }
+  if (amount) params.amount = amount
+  if (type) params.type = type
+  const query = buildQueryString(params)
+  return request<CategoryPrediction | null>(`/smart-suggestions/predict-category${query}`)
+}
+
+export interface QuickEntry {
+  remark: string
+  category: string
+  type: 'income' | 'expense'
+  amount: number
+  frequency: number
+  member: Member
+}
+
+export function getQuickEntries(limit?: number): Promise<ApiResponse<QuickEntry[]>> {
+  const params = limit ? { limit } : null
+  const query = buildQueryString(params)
+  return request<QuickEntry[]>(`/smart-suggestions/quick-entries${query}`)
+}
+
+export interface GoalMilestone {
+  percentage: number
+  label: string
+  achieved: boolean
+}
+
+export interface FinancialGoal {
+  id: number
+  name: string
+  target_amount: number
+  current_amount: number
+  deadline: string | null
+  description: string | null
+  color: string
+  icon: string
+  auto_track: number
+  status: 'active' | 'completed' | 'paused'
+  created_at: string
+  updated_at: string
+  progress_percentage: number
+  remaining_amount: number
+  monthly_savings_needed: number
+  estimated_completion_date: string | null
+  milestones: GoalMilestone[]
+  transactions?: Array<Record<string, unknown>>
+}
+
+export interface CreateGoalData {
+  name: string
+  target_amount: number
+  deadline?: string
+  description?: string
+  color?: string
+  icon?: string
+  auto_track?: boolean
+}
+
+export interface UpdateGoalData {
+  name?: string
+  target_amount?: number
+  current_amount?: number
+  deadline?: string
+  description?: string
+  color?: string
+  icon?: string
+  auto_track?: boolean
+  status?: 'active' | 'completed' | 'paused'
+}
+
+export interface GoalDepositData {
+  amount: number
+  remark?: string
+  transaction_id?: number
+}
+
+export interface GoalWithdrawData {
+  amount: number
+  remark?: string
+}
+
+export function getGoals(status?: string): Promise<ApiResponse<FinancialGoal[]>> {
+  const params = status ? { status } : null
+  const query = buildQueryString(params)
+  return request<FinancialGoal[]>(`/goals${query}`)
+}
+
+export function getGoal(id: number): Promise<ApiResponse<FinancialGoal>> {
+  return request<FinancialGoal>(`/goals/${id}`)
+}
+
+export function createGoal(data: CreateGoalData): Promise<ApiResponse<FinancialGoal>> {
+  return request<FinancialGoal>('/goals', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function updateGoal(
+  id: number,
+  data: UpdateGoalData
+): Promise<ApiResponse<FinancialGoal>> {
+  return request<FinancialGoal>(`/goals/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export function deleteGoal(id: number): Promise<ApiResponse<{ id: number }>> {
+  return request<{ id: number }>(`/goals/${id}`, {
+    method: 'DELETE',
+  })
+}
+
+export function depositToGoal(
+  id: number,
+  data: GoalDepositData
+): Promise<ApiResponse<FinancialGoal>> {
+  return request<FinancialGoal>(`/goals/${id}/deposit`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function withdrawFromGoal(
+  id: number,
+  data: GoalWithdrawData
+): Promise<ApiResponse<FinancialGoal>> {
+  return request<FinancialGoal>(`/goals/${id}/withdraw`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
 }

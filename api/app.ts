@@ -20,6 +20,8 @@ import statisticsRoutes from './routes/statistics.js'
 import importExportRoutes from './routes/import-export.js'
 import recurringRoutes from './routes/recurring.js'
 import aaRoutes from './routes/aa-records.js'
+import smartSuggestionsRoutes from './routes/smart-suggestions.js'
+import goalRoutes from './routes/goals.js'
 import { checkAndGenerateRecurring } from './services/recurring-service.js'
 import cron from 'node-cron'
 
@@ -44,6 +46,8 @@ app.use('/api/statistics', statisticsRoutes)
 app.use('/api/import-export', importExportRoutes)
 app.use('/api/recurring', recurringRoutes)
 app.use('/api/aa', aaRoutes)
+app.use('/api/smart-suggestions', smartSuggestionsRoutes)
+app.use('/api/goals', goalRoutes)
 
 checkAndGenerateRecurring()
 

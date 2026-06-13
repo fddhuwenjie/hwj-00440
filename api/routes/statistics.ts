@@ -33,14 +33,20 @@ router.get('/overview', (req: Request, res: Response): void => {
 
     const incomeRow = db.prepare(`
       SELECT COALESCE(SUM(amount), 0) as total
-      FROM transactions
+      FROM transactions t
       WHERE type = 'income' AND date >= ? AND date <= ?
+        AND NOT EXISTS (
+          SELECT 1 FROM transaction_splits ts WHERE ts.parent_transaction_id = t.id
+        )
     `).get(start, end) as { total: number }
 
     const expenseRow = db.prepare(`
       SELECT COALESCE(SUM(amount), 0) as total
-      FROM transactions
+      FROM transactions t
       WHERE type = 'expense' AND date >= ? AND date <= ?
+        AND NOT EXISTS (
+          SELECT 1 FROM transaction_splits ts WHERE ts.parent_transaction_id = t.id
+        )
     `).get(start, end) as { total: number }
 
     const totalIncome = incomeRow.total
@@ -93,14 +99,16 @@ router.get('/trend', (req: Request, res: Response): void => {
 
       const incomeRow = db.prepare(`
         SELECT COALESCE(SUM(amount), 0) as total
-        FROM transactions
+        FROM transactions t
         WHERE type = 'income' AND date >= ? AND date <= ?
+          AND NOT EXISTS (SELECT 1 FROM transaction_splits ts WHERE ts.parent_transaction_id = t.id)
       `).get(start, end) as { total: number }
 
       const expenseRow = db.prepare(`
         SELECT COALESCE(SUM(amount), 0) as total
-        FROM transactions
+        FROM transactions t
         WHERE type = 'expense' AND date >= ? AND date <= ?
+          AND NOT EXISTS (SELECT 1 FROM transaction_splits ts WHERE ts.parent_transaction_id = t.id)
       `).get(start, end) as { total: number }
 
       return {
@@ -141,8 +149,9 @@ router.get('/category-pie', (req: Request, res: Response): void => {
         category,
         SUM(amount) as total,
         COUNT(*) as count
-      FROM transactions
+      FROM transactions t
       WHERE type = 'expense' AND date >= ? AND date <= ?
+        AND NOT EXISTS (SELECT 1 FROM transaction_splits ts WHERE ts.parent_transaction_id = t.id)
       GROUP BY category
       ORDER BY total DESC
     `).all(start, end) as Array<{ category: string; total: number; count: number }>
@@ -207,6 +216,7 @@ router.get('/top-expenses', (req: Request, res: Response): void => {
       FROM transactions t
       LEFT JOIN members m ON t.member_id = m.id
       WHERE t.type = 'expense' AND t.date >= ? AND t.date <= ?
+        AND NOT EXISTS (SELECT 1 FROM transaction_splits ts WHERE ts.parent_transaction_id = t.id)
       ORDER BY t.amount DESC
       LIMIT ?
     `).all(start, end, limitNum) as Array<Record<string, unknown>>
@@ -269,6 +279,7 @@ router.get('/tag-summary', (req: Request, res: Response): void => {
       LEFT JOIN transaction_tags tt ON tg.id = tt.tag_id
       LEFT JOIN transactions t ON tt.transaction_id = t.id
         AND t.type = 'expense' AND t.date >= ? AND t.date <= ?
+        AND NOT EXISTS (SELECT 1 FROM transaction_splits ts WHERE ts.parent_transaction_id = t.id)
       GROUP BY tg.id, tg.name, tg.color
       ORDER BY total DESC
     `).all(start, end) as Array<{ id: number; name: string; color: string; total: number; count: number }>
@@ -277,6 +288,7 @@ router.get('/tag-summary', (req: Request, res: Response): void => {
       SELECT COALESCE(SUM(amount), 0) as total
       FROM transactions
       WHERE type = 'expense' AND date >= ? AND date <= ?
+        AND NOT EXISTS (SELECT 1 FROM transaction_splits ts WHERE ts.parent_transaction_id = transactions.id)
     `).get(start, end) as { total: number }
 
     const totalExpense = totalExpenseRow.total
@@ -327,24 +339,28 @@ router.get('/monthly-comparison', (req: Request, res: Response): void => {
       SELECT COALESCE(SUM(amount), 0) as total
       FROM transactions
       WHERE type = 'income' AND date >= ? AND date <= ?
+        AND NOT EXISTS (SELECT 1 FROM transaction_splits ts WHERE ts.parent_transaction_id = transactions.id)
     `).get(currStart, currEnd) as { total: number }
 
     const prevIncomeRow = db.prepare(`
       SELECT COALESCE(SUM(amount), 0) as total
       FROM transactions
       WHERE type = 'income' AND date >= ? AND date <= ?
+        AND NOT EXISTS (SELECT 1 FROM transaction_splits ts WHERE ts.parent_transaction_id = transactions.id)
     `).get(prevStart, prevEnd) as { total: number }
 
     const currExpenseRow = db.prepare(`
       SELECT COALESCE(SUM(amount), 0) as total
       FROM transactions
       WHERE type = 'expense' AND date >= ? AND date <= ?
+        AND NOT EXISTS (SELECT 1 FROM transaction_splits ts WHERE ts.parent_transaction_id = transactions.id)
     `).get(currStart, currEnd) as { total: number }
 
     const prevExpenseRow = db.prepare(`
       SELECT COALESCE(SUM(amount), 0) as total
       FROM transactions
       WHERE type = 'expense' AND date >= ? AND date <= ?
+        AND NOT EXISTS (SELECT 1 FROM transaction_splits ts WHERE ts.parent_transaction_id = transactions.id)
     `).get(prevStart, prevEnd) as { total: number }
 
     const currIncome = currIncomeRow.total
@@ -362,6 +378,7 @@ router.get('/monthly-comparison', (req: Request, res: Response): void => {
       SELECT category, SUM(amount) as total
       FROM transactions
       WHERE type = 'expense' AND date >= ? AND date <= ?
+        AND NOT EXISTS (SELECT 1 FROM transaction_splits ts WHERE ts.parent_transaction_id = transactions.id)
       GROUP BY category
     `).all(currStart, currEnd) as Array<{ category: string; total: number }>
 
@@ -369,6 +386,7 @@ router.get('/monthly-comparison', (req: Request, res: Response): void => {
       SELECT category, SUM(amount) as total
       FROM transactions
       WHERE type = 'expense' AND date >= ? AND date <= ?
+        AND NOT EXISTS (SELECT 1 FROM transaction_splits ts WHERE ts.parent_transaction_id = transactions.id)
       GROUP BY category
     `).all(prevStart, prevEnd) as Array<{ category: string; total: number }>
 

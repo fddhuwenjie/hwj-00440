@@ -188,7 +188,7 @@ function detectBillFormat(headers: string[]): 'alipay' | 'wechat' | 'general' {
   return 'general'
 }
 
-function mapFields(headers: string[], format: string): Record<string, number> {
+function mapFields(headers: string[]): Record<string, number> {
   const fieldMap: Record<string, number> = {}
 
   for (const [field, aliases] of Object.entries(FIELD_MAPPINGS)) {
@@ -224,7 +224,7 @@ function parseAmount(amountStr: string): number {
 }
 
 function normalizeDate(dateStr: string): string {
-  let cleaned = dateStr.trim()
+  const cleaned = dateStr.trim()
 
   if (/^\d{4}-\d{2}-\d{2}/.test(cleaned)) {
     return cleaned.substring(0, 10)
@@ -320,8 +320,7 @@ router.post(
       }
 
       const headers = rows[0]
-      const format = detectBillFormat(headers)
-      const fieldMap = mapFields(headers, format)
+      const fieldMap = mapFields(headers)
 
       if (fieldMap.date === undefined || fieldMap.amount === undefined) {
         res.json({

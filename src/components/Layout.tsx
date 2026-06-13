@@ -10,12 +10,14 @@ import {
   Download,
   Menu,
   X,
+  Target,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
   { path: '/', label: '首页', icon: Home },
   { path: '/transactions', label: '账目管理', icon: Wallet },
+  { path: '/goals', label: '财务目标', icon: Target },
   { path: '/members', label: '成员管理', icon: Users },
   { path: '/budgets', label: '预算管理', icon: PieChart },
   { path: '/statistics', label: '统计分析', icon: TrendingUp },
